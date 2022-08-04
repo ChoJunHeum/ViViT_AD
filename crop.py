@@ -76,7 +76,7 @@ if __name__ == "__main__":
                 t3/ <- (t-1) th frame
                 t4/ <- (t) th frame (target frame, gt)
     '''
-    outpath = '/home/chojh21c/ADGW/ViT_MT/datasets/avenue_cropped_04/'
+    outpath = '/home/chojh21c/ADGW/ViT_MT/datasets/avenue_cropped_08_64/'
     dpath = '/home/chojh21c/ADGW/ViT_MT/datasets/avenue/training/'
     dirs = os.listdir(dpath)
     dirs.sort()

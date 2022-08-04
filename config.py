@@ -12,7 +12,7 @@ if not os.path.exists('results'):
 
 share_config = {'mode': 'training',
                 'dataset': 'avenue',
-                'img_size': (256, 256),
+                'img_size': (64, 64),
                 'data_root': '/home/chojh21c/ADGW/ViT_MT/datasets/'}  # remember the final '/'
 
 
@@ -55,8 +55,8 @@ def update_config(args=None, mode=None):
         share_config['optimizer'] = args.optimizer
         share_config['scheduler'] = args.scheduler
 
-        share_config['resize_w'] = 256
-        share_config['resize_h'] = 256
+        share_config['resize_w'] = 64
+        share_config['resize_h'] = 64
         share_config['symmetric'] = True
         share_config['verbose'] = 10
         

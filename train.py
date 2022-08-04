@@ -15,12 +15,14 @@ from config import update_config
 import init_utils
 import data_utils
 import log_utils
-import crop_utils
 import ops
+
+from torchviz import make_dot
+
 
 parser = argparse.ArgumentParser(description='Advision')
 
-parser.add_argument('--batch_size', '-bs', default=32, type=int)
+parser.add_argument('--batch_size', '-bs', default=256, type=int)
 parser.add_argument('--epoch', '-e', default=10000, type=int )
 parser.add_argument('--dataset', '-ds', default='avenue', type=str)
 parser.add_argument('--resume', '-r', default=None, type=str)
@@ -28,7 +30,7 @@ parser.add_argument('--model', '-m', default='vivit', type=str)
 
 parser.add_argument('--bounding_box_weight', '-bbw', default=0.2, type=float)
 parser.add_argument('--confidence_score', '-cs', default=.4, type=float)
-parser.add_argument('--input_size', '-is', default=256, type=int)
+parser.add_argument('--input_size', '-is', default=64, type=int)
 parser.add_argument('--patch_size', '-ps', default=16, type=int)
 parser.add_argument('--nframe', '-nf', default=9, type=int)
 
@@ -71,7 +73,6 @@ def train(cfg):
     logger.info(f'Model save path: {save_prefix}')
 
     start_iter = step if cfg.resume else 0
-    pil2tensor = ToTensor()
 
     train_dataloader = DataLoader(dataset=train_dataset, batch_size=cfg.batch_size, shuffle=True)
 
@@ -99,11 +100,11 @@ def train(cfg):
 
                 frames = rearrange(frames, 'b (t c) w h -> b t c w h', c = 3).cuda()
 
-                
                 pred_ta, pred_irr, pred_rot = ops.step_train(frames, model, losses,
                                                 opts, schs, cfg,epoch=epoch,
                                                 global_step=global_step, cur_iter=i)
 
+                # acc, ta_acc , irr_acc , rot_acc, count = ops.cal_acc(pred_ta, pred_irr, pred_rot)
                 acc, ta_acc , irr_acc , rot_acc, count = ops.cal_acc(pred_ta, pred_irr, pred_rot)
 
 
@@ -119,11 +120,10 @@ def train(cfg):
                 epoch_rot_acc += rot_acc
                 epoch_rot_count += count
 
-
                 if i % 100 == 0:
-                    print(f'[Train-{epoch}-{i}] Total acc: {1-(epoch_acc/epoch_count):.2f} | ',
-                    f'TA acc: {1-(epoch_ta_acc/epoch_ta_count):.2f} | IRR acc: {1-(epoch_irr_acc/epoch_irr_count):.2f} | ',
-                    f'ROT acc: {1-(epoch_rot_acc/epoch_rot_count):.2f}')
+                    print(f'[Train-{epoch}-{i}] Total acc: {(epoch_acc/epoch_count):.2f} | ',
+                    f'TA acc: {(epoch_ta_acc/epoch_ta_count):.2f} | IRR acc: {(epoch_irr_acc/epoch_irr_count):.2f} | '
+                    f'ROT acc: {(epoch_rot_acc/epoch_rot_count):.2f}')
 
                     # print(pred_ta, pred_irr, pred_rot)
                     # break

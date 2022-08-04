@@ -29,13 +29,14 @@ class Transformer(nn.Module):
 
   
 class ViViT(nn.Module):
-    def __init__(self, image_size, patch_size, num_frames, dim = 256, depth = 4, heads = 3, 
+    def __init__(self, image_size, patch_size, num_frames = 5, dim = 256, depth = 8, heads = 4, 
                  in_channels = 3, dim_head = 64, dropout = 0., emb_dropout = 0., scale_dim = 4, ):
         super().__init__()
         
         assert image_size % patch_size == 0, 'Image dimensions must be divisible by the patch size.'
 
         num_patches = (image_size // patch_size) ** 2
+        print("num_patches: ", num_patches)
         patch_dim = in_channels * patch_size ** 2
         # patch_size:patch_dim = (64, 12288) (32, 3072) (16, 768)
 
@@ -44,34 +45,31 @@ class ViViT(nn.Module):
             nn.Linear(patch_dim, dim),
         )
 
-        self.sp_pos_embedding = nn.Parameter(torch.randn(1, 5, num_patches + 1, dim))
-        self.sq_pos_embedding = nn.Parameter(torch.randn(1, num_patches, 6, dim))
+        self.sp_pos_embedding = nn.Parameter(torch.randn(1, num_frames, num_patches + 1, dim))
+        self.sq_pos_embedding = nn.Parameter(torch.randn(1, 16, num_frames + 1, dim))
         self.space_token = nn.Parameter(torch.randn(1, 1, dim))
         self.space_transformer = Transformer(dim, depth, heads, dim_head, dim*scale_dim, dropout)
 
         self.temporal_token = nn.Parameter(torch.randn(1, 1, dim))
         self.temporal_transformer = Transformer(dim, depth, heads, dim_head, dim*scale_dim, dropout)
 
-        # self.dropout = nn.Dropout(emb_dropout)
+        self.dropout = nn.Dropout(emb_dropout)
 
         self.dim = dim
 
         self.ta_linear = nn.Sequential(
             nn.LayerNorm(dim),
             nn.Linear(dim, 2),
-            # nn.Softmax()
         )
 
         self.irr_linear = nn.Sequential(
             nn.LayerNorm(dim),
             nn.Linear(dim, 2),
-            # nn.Softmax()
         )
         
         self.rot_linear = nn.Sequential(
             nn.LayerNorm(dim),
             nn.Linear(dim, 2),
-            # nn.Softmax()
         )
     
     def A_ViT(self, x, level):
@@ -81,24 +79,26 @@ class ViViT(nn.Module):
         if level == 'space':
             cls_tokens = repeat(self.space_token, '() n d -> b t n d', b = b, t=t)
             
-            x = torch.cat((cls_tokens, x), dim=2)
+            x = torch.cat((cls_tokens, x), dim=2)        
 
             x += self.sp_pos_embedding[:, :, :(n + 1)]
+            x = self.dropout(x)
+
+            x = rearrange(x, 'b n m d -> (b n) m d')
+            x = self.space_transformer(x)
 
         else:
-            x = rearrange(x, 'b t n d -> b n t d')
             
+            x = rearrange(x, 'b t n d -> b n t d')
             cls_tokens = repeat(self.temporal_token, '() t d -> b n t d', b = b, n=n)
 
             x = torch.cat((cls_tokens, x), dim=2)
-                        
+
             x += self.sq_pos_embedding[:, :, :(t + 1)]
+            x = self.dropout(x)
 
-        # x's shape: (b, t, n+1, d)
-        # x = self.dropout(x)
-
-        x = rearrange(x, 'b n m d -> (b n) m d')
-        x = self.space_transformer(x)
+            x = rearrange(x, 'b n m d -> (b n) m d')
+            x = self.temporal_transformer(x)
 
         return x
     
@@ -108,25 +108,31 @@ class ViViT(nn.Module):
         b, m, _ = x.shape
 
         if level == 'space':
-            cls_tokens = repeat(self.space_token, '() n d -> b n d', b = b)
+
+            cls_tokens = repeat(self.space_token, '() t d -> b t d', b = b)
+            
+            x = torch.cat((cls_tokens, x), dim=1)
+
+            x = self.space_transformer(x)
+
         else:
-            cls_tokens = repeat(self.temporal_token, '() t d -> b t d', b = b)
 
-        x = torch.cat((cls_tokens, x), dim=1)
+            cls_tokens = repeat(self.temporal_token, '() n d -> b n d', b = b)
 
-        # x = self.dropout(x)
+            x = torch.cat((cls_tokens, x), dim=1)
 
-        x = self.space_transformer(x)
+            x = self.temporal_transformer(x)
 
         return x
 
     def forward(self, x, task, levels):
         x = self.to_patch_embedding(x)
+
         # x's shape: (b, t, w*h, dim)
         # n  : w * h
         # dim: patch's feature
         
-        b= x.shape[0]
+        b = x.shape[0]
 
         x = self.A_ViT(x, levels[0])
         
@@ -155,7 +161,7 @@ class ViViT(nn.Module):
 if __name__ == "__main__":
     
     #                 b  t  c  h    w
-    img = torch.ones([3, 5, 3, 256, 256]).cuda()
+    img = torch.ones([3, 5, 3, 64, 64]).cuda()
 
     # image_size, patch_size, num_classes, num_frames
     model = ViViT(256, 16, 5).cuda()
@@ -165,5 +171,8 @@ if __name__ == "__main__":
     print('Trainable Parameters: %.3fM' % parameters)
     
     out = model(img, task='ta', levels=['sequential', 'space'])
-    print(out)
+
+    # out = model(img, task='ta', levels=['space', 'sequential'])
+
+    print(out.shape)
     print("Shape of out :", out.shape)      # [B, num_classes]

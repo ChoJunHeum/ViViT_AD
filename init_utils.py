@@ -110,9 +110,9 @@ def get_losses(cfg):
                     intensity_loss,
                     flow_loss]
     '''
-    arr_loss = losses.arr_Loss().cuda()
-    irr_loss = losses.irr_Loss().cuda()
-    rot_loss = losses.rot_Loss().cuda()
+    arr_loss = losses.arr_bi_Loss().cuda()
+    irr_loss = losses.irr_bi_Loss().cuda()
+    rot_loss = losses.rot_bi_Loss().cuda()
 
 
     total_loss = [arr_loss,

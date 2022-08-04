@@ -88,6 +88,30 @@ class rot_Loss(nn.Module):
         return loss(rot_res, target)
 
 
+class arr_bi_Loss(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, arr_res, target):
+        loss = nn.CrossEntropyLoss()
+        return loss(arr_res, target)
+
+class irr_bi_Loss(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, irr_res, target):
+        loss = nn.CrossEntropyLoss()
+        return loss(irr_res, target)
+
+class rot_bi_Loss(nn.Module):
+    def __init__(self):
+        super().__init__()
+        
+    def forward(self, rot_res, target):
+        loss = nn.CrossEntropyLoss()
+        return loss(rot_res, target)
+
 
 # if __name__ == '__main__':
 #     # Debug Gradient_Loss, mainly on the padding issue.

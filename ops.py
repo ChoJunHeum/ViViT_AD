@@ -8,6 +8,7 @@ import data_utils
 import crop_utils
 
 import random
+from torchviz import make_dot
 
 logger = logging.getLogger('advision')
 
@@ -120,20 +121,16 @@ def step_train(inputs, model, losses,
 
     b = inputs.shape[0]
 
-    target = torch.cat([torch.Tensor([[0, 1]]*b), torch.Tensor([[1,0]]*b)], dim=0).cuda()
-        
+    target = torch.cat([torch.Tensor([[1,0]]*b), torch.Tensor([[0,1]]*b)], dim=0).cuda()
+    
     ta_loss, pred_ta = timeArrow(inputs, target, model, losses[0], cfg, global_step)
     rot_loss, pred_rot = rotation(inputs, target, model, losses[2], cfg, global_step)
     irr_loss, pred_irr = irregularity(inputs, target, model, losses[1], cfg, global_step)
-
-    print(pred_ta)
-    # quit()
-    # print(pred_rot)
-    # print(pred_irr)
-    
-
+    # loss_tot =  irr_loss
     loss_tot =  ta_loss + irr_loss + rot_loss*0.05
-    
+
+    # make_dot(loss_tot, params=dict(model.named_parameters()), show_saved=True).render("total_graph", format="png")
+
     opt_g.zero_grad()
     loss_tot.backward()
     opt_g.step()
@@ -144,11 +141,15 @@ def step_train(inputs, model, losses,
     if cur_iter % 100 == 0:
         print(f'[Train-{epoch}-{cur_iter}] Total loss: {loss_tot.item():.2f} | ', 
         f'ta_loss: {ta_loss.item():.2f} | irr_loss: {irr_loss.item():.2f} | rot_loss: {rot_loss.item():.2f}')
+        # f'ta_loss: {ta_loss.item():.2f} | irr_loss: {irr_loss.item():.2f}')
+
 
     if global_step % cfg.verbose == 0:
         logger.info(f'[Train-{epoch}-{global_step}] Total loss: {loss_tot.item():.2f} |')
+    
 
     return pred_ta, pred_irr, pred_rot
+    # return pred_ta, pred_irr
 
 
 def one_direction(inputs, targets,
@@ -216,12 +217,22 @@ def timeArrow(inputs, target,
 
     rev_inputs = inputs.flip([1])
     
-
+ 
     tot_inputs = torch.cat([inputs, rev_inputs], dim=0)
     
+
+    
     ta_res = model(tot_inputs, 'ta', levels=['sequential', 'space'])
+
+    # make_dot(ta_res, params=dict(model.named_parameters()), show_saved=True).render("ta_graph", format="png")
+
     
     ta_loss = loss(ta_res, target)
+
+    # print('ta_res',ta_res)
+    # print('targets: ', target)
+    # print('ta_loss', ta_loss)
+    # quit()  
 
     if global_step % cfg.verbose == 0:
         logger.info(f'[Train-{global_step}] | ta_loss: {ta_loss.item():.2f}')
@@ -238,9 +249,11 @@ def irregularity(inputs, target,
 
     diff = 4
 
-    while diff < 7:
-        indice = torch.Tensor(sorted(random.sample(range(0,8),5))).to(torch.int).cuda()
-        diff = indice[-1]-indice[0]
+    # while diff < 7:
+    #     indice = torch.Tensor(sorted(random.sample(range(0,8),5))).to(torch.int).cuda()
+    #     diff = indice[-1]-indice[0]
+    
+    indice = torch.Tensor([0,2,4,6,8]).to(torch.int).cuda()
 
     reg_inputs = inputs[:,:5]
     irr_inputs = inputs.index_select(1, indice)
@@ -248,6 +261,7 @@ def irregularity(inputs, target,
     tot_inputs = torch.cat([reg_inputs, irr_inputs], dim=0)
 
     irr_res = model(tot_inputs, 'irr', levels=['sequential', 'space'])
+    # make_dot(irr_res, params=dict(model.named_parameters()), show_saved=True).render("irr_graph", format="png")
 
     irr_loss = loss(irr_res, target)
 
@@ -270,6 +284,7 @@ def rotation(inputs, target,
     rot_inputs = inputs.rot90(rot_i,[3,4])
     tot_inputs = torch.cat([inputs, rot_inputs], dim=0)
     rot_res = model(tot_inputs, 'rot', levels=['sequential', 'space'])
+    # make_dot(rot_res, params=dict(model.named_parameters()), show_saved=True).render("rot_graph", format="png")
 
     rot_loss = loss(rot_res, target)
 
@@ -287,7 +302,10 @@ def cal_acc(pred_ta, pred_irr, pred_rot):
     ta_acc = torch.square(pred_ta.argmax(dim=1)-target).sum().detach()
     irr_acc = torch.square(pred_irr.argmax(dim=1)-target).sum().detach()
     rot_acc = torch.square(pred_rot.argmax(dim=1)-target).sum().detach()
-    
+        
+    # tot_acc = ta_acc + irr_acc 
+    # return tot_acc,ta_acc , irr_acc , b*2
+
     tot_acc = ta_acc + irr_acc + rot_acc
 
-    return tot_acc,ta_acc , irr_acc , rot_acc, b*2
+    return tot_acc, ta_acc , irr_acc , rot_acc, b*2

@@ -31,8 +31,12 @@ def get_model_opts(cfg, N=10000):
     # ViViT vit_models
     if gen_name == 'vivit':
         vit_model = ViViT(input_size, patch_size, frame_nums).cuda()
+        best_model = ViViT(input_size, patch_size, frame_nums).cuda()
+        
     elif gen_name == 'vivit_rgb':
         vit_model = ViViT_RGB(input_size, patch_size, frame_nums).cuda()
+        best_model = ViViT(input_size, patch_size, frame_nums).cuda()
+
     else:
         raise NotImplementedError    
     
@@ -97,8 +101,10 @@ def get_model_opts(cfg, N=10000):
             weights_init = weights_init_normal
         vit_model.apply(weights_init)
         print('vit_model and discriminator are going to be trained from scratch.')
+
+    best_model.load_state_dict(vit_model.state_dict())
     
-    return vit_model, opt_vit, sch_, info
+    return vit_model, best_model, opt_vit, sch_, info
 
 
 def get_losses(cfg):

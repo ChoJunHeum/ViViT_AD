@@ -86,6 +86,88 @@ class CropTrainDataset(Dataset):
 
         return x_t
 
+class TotalTrainDataset(Dataset):
+    """
+    cv2 imread: BGR, HWC (H, W, C)
+    PIL open: RGB, HWC (H, W, C)
+    ToTensor: [C, H, W]
+
+    batches:
+        x_t: [B, C_out * nframe, resize_h, resize_w]
+        y_t: [B, C_out, resize_h, resize_w]
+    """
+    def __init__(self, cfg):
+        self.resize_h = cfg.resize_h
+        self.resize_w = cfg.resize_w
+        self.symmetric = cfg.symmetric
+        self.device = cfg.device
+        self.pil2tensor = ToTensor()
+        total_frames = cfg.nframe  # input_frame 
+        self.clip_length = 8
+
+        self.all_path = [] # len(self.all_path) = nframe
+        for folder_t in sorted(glob.glob(f'{cfg.cropped_data}/*')): # t0, t1, ...
+            path_infolder = glob.glob(f'{folder_t}/*.jpg')
+            path_infolder.sort()
+            self.all_path.append(path_infolder) 
+
+        # self.all_path: [[t0], [t1], ... , [t8]]
+        # len(self.all_path) = 9
+
+        self.videos = []
+        self.all_seqs = []
+
+        for folder in sorted(glob.glob(f'{cfg.train_data}/*')):
+            all_imgs = glob.glob(f'{folder}/*.jpg')
+            all_imgs.sort()
+            self.videos.append(all_imgs)
+
+            random_seq = list(range(len(all_imgs) - 8))
+            self.all_seqs.append(random_seq)
+
+        lengths = [len(folder_t) for folder_t in self.all_path]
+        total_length = reduce(lambda x, y: x+y, lengths)
+
+        assert len(self.all_path) == total_frames, f'{len(self.all_path)} and {total_frames}'
+        assert total_length == lengths[0] * total_frames, f'{total_length} and {lengths[0] * total_frames}'
+
+    def __len__(self): 
+        '''
+        Return length of paired sets
+        '''
+        return len(self.all_path[0])
+
+    def __getitem__(self, index):
+        '''
+        frames_all = [ img_from_t0, img_from_t1, ... ]
+        len(frames_all) == nframe
+        one_path[i]: shape [3, resize_h, resize_w]
+        '''
+        one_patch_path = [folder_t[index] for folder_t in self.all_path]
+
+        one_patch = [img2tensor(path,
+                        pil2tensor=self.pil2tensor,
+                        resize_h=self.resize_h,
+                        resize_w=self.resize_w,
+                        symmetric=self.symmetric,
+                        ) for path in one_patch_path]
+        
+        x_t = torch.cat(one_patch, dim=0).to(self.device)
+
+        one_folder = self.videos[index]
+
+        video_clip = []
+
+        start = self.all_seqs[index][-1]  # Always use the last index in self.all_seqs.
+
+        for i in range(start, start + self.clip_length):
+            img = cv2.imread(one_folder[i])
+ 
+            video_clip.append(img)
+
+        return [x_t, video_clip]
+
+
 class train_target_dataset(Dataset):
     """
     No data augmentation.

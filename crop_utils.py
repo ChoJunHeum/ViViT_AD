@@ -35,8 +35,10 @@ def batch_detect(model, frame_d, confidence, device, coi=[0]):
 
     if device != 'cpu':
         areas = [area.cpu().numpy() for area in areas]
+        print("HELLO_CPU")
     else:
         areas = [area.numpy() for area in areas]
+        print("HELLO")
 
     areas_filtered = []
     for one_frame in areas:

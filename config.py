@@ -41,7 +41,7 @@ def update_config(args=None, mode=None):
         share_config['save_epoch'] = 1
 
 
-        share_config['resume'] = glob(f'weights/{args.resume}*')[0] if args.resume else None
+        share_config['resume'] = glob(f'logcheckpoints/{args.resume}*')[0] if args.resume else None
         share_config['epoch'] = args.epoch
         share_config['model'] = args.model
         share_config['device'] = 'cuda'

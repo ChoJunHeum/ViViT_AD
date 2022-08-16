@@ -29,8 +29,8 @@ class Transformer(nn.Module):
 
   
 class ViViT(nn.Module):
-    def __init__(self, image_size, patch_size, num_frames = 5, dim = 256, depth = 8, heads = 4, 
-                 in_channels = 3, dim_head = 64, dropout = 0., emb_dropout = 0., scale_dim = 4, ):
+    def __init__(self, image_size, patch_size, num_frames = 5, dim = 512, depth = 8, heads = 8, 
+                 in_channels = 3, dim_head = 64, dropout = 0., emb_dropout = 0., scale_dim = 8, ):
         super().__init__()
         
         assert image_size % patch_size == 0, 'Image dimensions must be divisible by the patch size.'

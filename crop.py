@@ -98,13 +98,17 @@ if __name__ == "__main__":
         total = math.ceil(vdatasets.len / batch_size)
         for batches in tqdm(vdatasets.get_batches(batch_size=batch_size), total=total):
             batch_num_detect, batch_frames_oth, batch_frames_d, batch_frame_t = batches
+            print(type(batch_frames_d[0]))
 
             batch_frames_d_ = batch_frames_d
             batch_areas = crop_utils.batch_detect(model, batch_frames_d_,
                                                 confidence=args.confidence,
                                                 device=device)
+            print(type(batch_frames_d[0]))
 
             for i, d in enumerate(batch_frames_d):
+                print(type(batch_frames_d[i]))
+                quit()
                 batch_frames_d[i] = Image.fromarray(batch_frames_d[i])
 
             for i in range(len(batch_frames_d)):

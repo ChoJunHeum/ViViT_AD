@@ -22,7 +22,7 @@ from torchviz import make_dot
 
 parser = argparse.ArgumentParser(description='Advision')
 
-parser.add_argument('--batch_size', '-bs', default=256, type=int)
+parser.add_argument('--batch_size', '-bs', default=64, type=int)
 parser.add_argument('--epoch', '-e', default=10000, type=int )
 parser.add_argument('--dataset', '-ds', default='avenue', type=str)
 parser.add_argument('--resume', '-r', default=None, type=str)
@@ -81,11 +81,15 @@ def train(cfg):
         logger.info('Start training')
 
         best_acc = 0
+        best_loss = 9999
 
         for epoch_ in range(cfg.epoch):
             epoch = epoch_ + 1
 
             epoch_acc = 0
+            epoch_count = 0
+
+            epoch_loss = 0
             epoch_count = 0
 
             epoch_ta_acc = 0
@@ -94,24 +98,26 @@ def train(cfg):
             epoch_irr_acc = 0
             epoch_irr_count = 0
 
-            # epoch_rot_acc = 0
-            # epoch_rot_count = 0
+            epoch_rot_acc = 0
+            epoch_rot_count = 0
 
             for i, frames in enumerate(train_dataloader):
                 i += 1
 
                 frames = rearrange(frames, 'b (t c) w h -> b t c w h', c = 3).cuda()
 
-                pred_ta, pred_irr = ops.step_train(frames, model, losses,
+                pred_ta, pred_irr, pred_rot, tot_loss = ops.step_train(frames, model, losses,
                                                 opts, schs, cfg,epoch=epoch,
                                                 global_step=global_step, cur_iter=i)
 
-                # acc, ta_acc , irr_acc , rot_acc, count = ops.cal_acc(pred_ta, pred_irr, pred_rot)
-                acc, ta_acc , irr_acc , count = ops.cal_acc(pred_ta, pred_irr)
+                acc, ta_acc , irr_acc , rot_acc, count = ops.cal_acc(pred_ta, pred_irr, pred_rot)
+                # acc, ta_acc , irr_acc , count = ops.cal_acc(pred_ta, pred_irr)
 
 
                 epoch_acc += acc
-                epoch_count += count*2
+                epoch_loss += tot_loss
+
+                epoch_count += count*3
 
                 epoch_ta_acc += ta_acc
                 epoch_ta_count += count
@@ -119,13 +125,13 @@ def train(cfg):
                 epoch_irr_acc += irr_acc
                 epoch_irr_count += count
 
-                # epoch_rot_acc += rot_acc
-                # epoch_rot_count += count
+                epoch_rot_acc += rot_acc
+                epoch_rot_count += count
 
                 if i % 100 == 0:
-                    print(f'[Train-{epoch}-{i}] Total acc: {(epoch_acc/epoch_count):.2f} | ',
-                    f'TA acc: {(epoch_ta_acc/epoch_ta_count):.2f} | IRR acc: {(epoch_irr_acc/epoch_irr_count):.2f}')
-                    # f'ROT acc: {(epoch_rot_acc/epoch_rot_count):.2f}')
+                    print(f'[Train-{epoch}-{i}] Total acc: {(epoch_acc/epoch_count):.2f} |  Total loss: {(epoch_loss):.2f} |',
+                    f'TA acc: {(epoch_ta_acc/epoch_ta_count):.2f} | IRR acc: {(epoch_irr_acc/epoch_irr_count):.2f}',
+                    f'ROT acc: {(epoch_rot_acc/epoch_rot_count):.2f}')
 
                     # print(pred_ta, pred_irr, pred_rot)
                     # break
@@ -135,15 +141,22 @@ def train(cfg):
                                 save_path=save_path)
 
             print(f'[Train-{epoch}-{i}] Total acc: {(epoch_acc/epoch_count):.2f} | ',
-                    f'TA acc: {(epoch_ta_acc/epoch_ta_count):.2f} | IRR acc: {(epoch_irr_acc/epoch_irr_count):.2f}')
+                    f'TA acc: {(epoch_ta_acc/epoch_ta_count):.2f} | IRR acc: {(epoch_irr_acc/epoch_irr_count):.2f} | IRR acc: {(epoch_rot_acc/epoch_rot_count):.2f}')
 
-            # if best_acc < epoch_acc:
-            #     best_model.load_state_dict(model.state_dict())
-            #     print(f"THE BEST!! UPDATE THE WEIGHT!! | CURRENT: {best_acc} / BEFORE: {epoch_acc}")
-            #     best_acc = epoch_acc
-            # else:
-            #     model.load_state_dict(best_model.state_dict())
-            #     print(f"BEST: {best_acc} | CURRENT: {epoch_acc}")
+            if best_loss > epoch_loss:
+                best_model.load_state_dict(model.state_dict())
+                print(f"THE BEST!! UPDATE THE WEIGHT!! | BEST: {best_acc} / {best_loss} | CURRENT: {epoch_acc} / {epoch_loss}")
+                best_acc = epoch_acc
+                best_loss = epoch_loss
+
+                save_path = join(save_prefix, f'best_model_e{epoch}.pt')                                
+                init_utils.save_all(best_model, opts, schs,
+                                save_path=save_path)
+            
+            if epoch % 5 == 0:
+                model.load_state_dict(best_model.state_dict())
+            
+            print(f"BEST: {best_acc} / {best_loss} | CURRENT: {epoch_acc} / {epoch_loss}")
 
     except:
         save_path = join(save_prefix, f'total_model_ex.pt')   
